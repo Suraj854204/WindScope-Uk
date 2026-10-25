@@ -1,0 +1,37 @@
+# WindScope UK - local stack.  `docker compose up --build`  ->  http://localhost:8080
+services:
+  backend:
+    build: ./backend
+    environment:
+      WINDSCOPE_APP_ENV: ${WINDSCOPE_APP_ENV:-production}
+      WINDSCOPE_LOG_LEVEL: ${WINDSCOPE_LOG_LEVEL:-INFO}
+      WINDSCOPE_CORS_ORIGINS: ${WINDSCOPE_CORS_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      WINDSCOPE_AUTO_INGEST_ON_STARTUP: ${WINDSCOPE_AUTO_INGEST_ON_STARTUP:-true}
+      WINDSCOPE_PERIOD_START: ${WINDSCOPE_PERIOD_START:-2026-01-01}
+      WINDSCOPE_PERIOD_END: ${WINDSCOPE_PERIOD_END:-2026-01-31}
+    volumes:
+      - windscope-cache:/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  windscope-cache:

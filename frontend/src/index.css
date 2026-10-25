@@ -1,0 +1,78 @@
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter Variable', Inter, system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01', 'tnum';
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    color-scheme: light;
+  }
+  body {
+    @apply bg-canvas text-ink-800;
+    margin: 0;
+    min-width: 320px;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply text-ink-900;
+    letter-spacing: -0.01em;
+  }
+  :focus-visible {
+    outline: 2px solid #0891b2;
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+  .on-dark :focus-visible {
+    outline-color: #22d3ee;
+  }
+  ::selection {
+    background: #a5f3fc;
+    color: #0a1224;
+  }
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+  .label-caps {
+    @apply text-2xs font-medium uppercase tracking-[0.08em] text-ink-500;
+  }
+  .panel {
+    @apply rounded-md border border-line bg-canvas-raised shadow-panel;
+  }
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #c9c4b5 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Recharts: keep axis text legible and tabular */
+.recharts-text {
+  font-variant-numeric: tabular-nums;
+}
+.recharts-cartesian-axis-tick-value {
+  fill: #4a5265;
+}

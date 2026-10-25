@@ -1,0 +1,3616 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WindScope UK API",
+    "description": "\nWind-forecast accuracy analytics for a UK day-ahead trading team, built only from Elexon\n**FUELHH** (actual wind generation, `fuelType=WIND`) and **WINDFOR** (wind forecasts).\n\nFor each half-hourly delivery interval the API selects the **latest WINDFOR forecast whose\n`publishTime` is at or before the configured decision cutoff**, matches it to the actual on\nnormalised UTC timestamps, and reports MAE, RMSE, signed bias (forecast - actual) and WAPE\n(only when its denominator is valid). Units: megawatts (MW). `null` means *not available*, never zero.\n",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Liveness probe",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Get Config",
+        "operationId": "get_config_api_v1_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dataset/status": {
+      "get": {
+        "tags": [
+          "dataset"
+        ],
+        "summary": "Dataset Status",
+        "operationId": "dataset_status_api_v1_dataset_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetStatusOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dataset/refresh": {
+      "post": {
+        "tags": [
+          "dataset"
+        ],
+        "summary": "Refresh Dataset",
+        "description": "Start (or retry) the download in the background. Cached requests are skipped unless\n``force`` is true. Poll ``/api/v1/dataset/status`` for progress.",
+        "operationId": "refresh_dataset_api_v1_dataset_refresh_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/summary": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Summary",
+        "operationId": "summary_api_v1_analysis_summary_get",
+        "parameters": [
+          {
+            "name": "bin_width_mw",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 10000,
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Bin Width Mw"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First London delivery date (inclusive)",
+              "title": "Date From"
+            },
+            "description": "First London delivery date (inclusive)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last London delivery date (inclusive)",
+              "title": "Date To"
+            },
+            "description": "Last London delivery date (inclusive)"
+          },
+          {
+            "name": "cutoff_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day_ahead",
+                "lead_time"
+              ],
+              "type": "string",
+              "default": "day_ahead",
+              "title": "Cutoff Mode"
+            }
+          },
+          {
+            "name": "cutoff_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "HH:MM Europe/London",
+              "title": "Cutoff Time"
+            },
+            "description": "HH:MM Europe/London"
+          },
+          {
+            "name": "days_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days Before"
+            }
+          },
+          {
+            "name": "lead_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 336,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lead Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/series": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Series",
+        "operationId": "series_api_v1_analysis_series_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First London delivery date (inclusive)",
+              "title": "Date From"
+            },
+            "description": "First London delivery date (inclusive)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last London delivery date (inclusive)",
+              "title": "Date To"
+            },
+            "description": "Last London delivery date (inclusive)"
+          },
+          {
+            "name": "cutoff_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day_ahead",
+                "lead_time"
+              ],
+              "type": "string",
+              "default": "day_ahead",
+              "title": "Cutoff Mode"
+            }
+          },
+          {
+            "name": "cutoff_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "HH:MM Europe/London",
+              "title": "Cutoff Time"
+            },
+            "description": "HH:MM Europe/London"
+          },
+          {
+            "name": "days_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days Before"
+            }
+          },
+          {
+            "name": "lead_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 336,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lead Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/intervals": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Intervals Page",
+        "operationId": "intervals_page_api_v1_analysis_intervals_get",
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Page Size"
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "start_time",
+                "actual_mw",
+                "forecast_mw",
+                "signed_error_mw",
+                "abs_error_mw",
+                "forecast_publish_time"
+              ],
+              "type": "string",
+              "default": "start_time",
+              "title": "Sort By"
+            }
+          },
+          {
+            "name": "sort_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "asc",
+              "title": "Sort Dir"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "all",
+                "over",
+                "under",
+                "exact"
+              ],
+              "type": "string",
+              "default": "all",
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First London delivery date (inclusive)",
+              "title": "Date From"
+            },
+            "description": "First London delivery date (inclusive)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last London delivery date (inclusive)",
+              "title": "Date To"
+            },
+            "description": "Last London delivery date (inclusive)"
+          },
+          {
+            "name": "cutoff_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day_ahead",
+                "lead_time"
+              ],
+              "type": "string",
+              "default": "day_ahead",
+              "title": "Cutoff Mode"
+            }
+          },
+          {
+            "name": "cutoff_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "HH:MM Europe/London",
+              "title": "Cutoff Time"
+            },
+            "description": "HH:MM Europe/London"
+          },
+          {
+            "name": "days_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days Before"
+            }
+          },
+          {
+            "name": "lead_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 336,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lead Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntervalsPageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/intervals.csv": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Intervals Csv",
+        "description": "CSV of exactly the rows matching the current filters (all pages).",
+        "operationId": "intervals_csv_api_v1_analysis_intervals_csv_get",
+        "parameters": [
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "start_time",
+                "actual_mw",
+                "forecast_mw",
+                "signed_error_mw",
+                "abs_error_mw",
+                "forecast_publish_time"
+              ],
+              "type": "string",
+              "default": "start_time",
+              "title": "Sort By"
+            }
+          },
+          {
+            "name": "sort_dir",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "asc",
+              "title": "Sort Dir"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "all",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "all",
+                "over",
+                "under",
+                "exact"
+              ],
+              "type": "string",
+              "default": "all",
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 100,
+              "default": "",
+              "title": "Q"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First London delivery date (inclusive)",
+              "title": "Date From"
+            },
+            "description": "First London delivery date (inclusive)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last London delivery date (inclusive)",
+              "title": "Date To"
+            },
+            "description": "Last London delivery date (inclusive)"
+          },
+          {
+            "name": "cutoff_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day_ahead",
+                "lead_time"
+              ],
+              "type": "string",
+              "default": "day_ahead",
+              "title": "Cutoff Mode"
+            }
+          },
+          {
+            "name": "cutoff_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "HH:MM Europe/London",
+              "title": "Cutoff Time"
+            },
+            "description": "HH:MM Europe/London"
+          },
+          {
+            "name": "days_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days Before"
+            }
+          },
+          {
+            "name": "lead_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 336,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lead Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/intervals/{start_time}": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Interval Detail",
+        "description": "One interval with every forecast vintage, showing which were usable at the cutoff.",
+        "operationId": "interval_detail_api_v1_analysis_intervals__start_time__get",
+        "parameters": [
+          {
+            "name": "start_time",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Start Time"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First London delivery date (inclusive)",
+              "title": "Date From"
+            },
+            "description": "First London delivery date (inclusive)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last London delivery date (inclusive)",
+              "title": "Date To"
+            },
+            "description": "Last London delivery date (inclusive)"
+          },
+          {
+            "name": "cutoff_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day_ahead",
+                "lead_time"
+              ],
+              "type": "string",
+              "default": "day_ahead",
+              "title": "Cutoff Mode"
+            }
+          },
+          {
+            "name": "cutoff_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "HH:MM Europe/London",
+              "title": "Cutoff Time"
+            },
+            "description": "HH:MM Europe/London"
+          },
+          {
+            "name": "days_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days Before"
+            }
+          },
+          {
+            "name": "lead_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 336,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lead Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IntervalDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/accuracy": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Accuracy",
+        "operationId": "accuracy_api_v1_analysis_accuracy_get",
+        "parameters": [
+          {
+            "name": "granularity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day",
+                "week"
+              ],
+              "type": "string",
+              "default": "day",
+              "title": "Granularity"
+            }
+          },
+          {
+            "name": "top_n",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Top N"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First London delivery date (inclusive)",
+              "title": "Date From"
+            },
+            "description": "First London delivery date (inclusive)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last London delivery date (inclusive)",
+              "title": "Date To"
+            },
+            "description": "Last London delivery date (inclusive)"
+          },
+          {
+            "name": "cutoff_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day_ahead",
+                "lead_time"
+              ],
+              "type": "string",
+              "default": "day_ahead",
+              "title": "Cutoff Mode"
+            }
+          },
+          {
+            "name": "cutoff_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "HH:MM Europe/London",
+              "title": "Cutoff Time"
+            },
+            "description": "HH:MM Europe/London"
+          },
+          {
+            "name": "days_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days Before"
+            }
+          },
+          {
+            "name": "lead_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 336,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lead Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccuracyOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis/cutoff-sensitivity": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Cutoff Sensitivity",
+        "operationId": "cutoff_sensitivity_api_v1_analysis_cutoff_sensitivity_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First London delivery date (inclusive)",
+              "title": "Date From"
+            },
+            "description": "First London delivery date (inclusive)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last London delivery date (inclusive)",
+              "title": "Date To"
+            },
+            "description": "Last London delivery date (inclusive)"
+          },
+          {
+            "name": "cutoff_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day_ahead",
+                "lead_time"
+              ],
+              "type": "string",
+              "default": "day_ahead",
+              "title": "Cutoff Mode"
+            }
+          },
+          {
+            "name": "cutoff_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "HH:MM Europe/London",
+              "title": "Cutoff Time"
+            },
+            "description": "HH:MM Europe/London"
+          },
+          {
+            "name": "days_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days Before"
+            }
+          },
+          {
+            "name": "lead_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 336,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lead Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SensitivityOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/quality": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Quality",
+        "operationId": "quality_api_v1_quality_get",
+        "parameters": [
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "First London delivery date (inclusive)",
+              "title": "Date From"
+            },
+            "description": "First London delivery date (inclusive)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Last London delivery date (inclusive)",
+              "title": "Date To"
+            },
+            "description": "Last London delivery date (inclusive)"
+          },
+          {
+            "name": "cutoff_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "day_ahead",
+                "lead_time"
+              ],
+              "type": "string",
+              "default": "day_ahead",
+              "title": "Cutoff Mode"
+            }
+          },
+          {
+            "name": "cutoff_time",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "HH:MM Europe/London",
+              "title": "Cutoff Time"
+            },
+            "description": "HH:MM Europe/London"
+          },
+          {
+            "name": "days_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 14,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Days Before"
+            }
+          },
+          {
+            "name": "lead_hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "maximum": 336,
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lead Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QualityOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccuracyOut": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PeriodOut"
+          },
+          "cutoff": {
+            "$ref": "#/components/schemas/CutoffOut"
+          },
+          "granularity": {
+            "type": "string",
+            "enum": [
+              "day",
+              "week"
+            ],
+            "title": "Granularity"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MetricsOut"
+          },
+          "buckets": {
+            "items": {
+              "$ref": "#/components/schemas/BucketOut"
+            },
+            "type": "array",
+            "title": "Buckets"
+          },
+          "bias_direction": {
+            "$ref": "#/components/schemas/BiasDirectionOut"
+          },
+          "high_error_intervals": {
+            "items": {
+              "$ref": "#/components/schemas/IntervalOut"
+            },
+            "type": "array",
+            "title": "High Error Intervals"
+          },
+          "high_error_note": {
+            "type": "string",
+            "title": "High Error Note"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/WarningOut"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "cutoff",
+          "granularity",
+          "metrics",
+          "buckets",
+          "bias_direction",
+          "high_error_intervals",
+          "high_error_note",
+          "warnings"
+        ],
+        "title": "AccuracyOut"
+      },
+      "ActualQualityOut": {
+        "properties": {
+          "expected_intervals": {
+            "type": "integer",
+            "title": "Expected Intervals"
+          },
+          "intervals_with_record": {
+            "type": "integer",
+            "title": "Intervals With Record"
+          },
+          "intervals_missing": {
+            "type": "integer",
+            "title": "Intervals Missing"
+          },
+          "intervals_valid": {
+            "type": "integer",
+            "title": "Intervals Valid"
+          },
+          "intervals_invalid_value": {
+            "type": "integer",
+            "title": "Intervals Invalid Value"
+          },
+          "intervals_ambiguous": {
+            "type": "integer",
+            "title": "Intervals Ambiguous"
+          },
+          "duplicate_groups": {
+            "type": "integer",
+            "title": "Duplicate Groups"
+          },
+          "duplicate_records_dropped": {
+            "type": "integer",
+            "title": "Duplicate Records Dropped"
+          },
+          "conflicting_groups": {
+            "type": "integer",
+            "title": "Conflicting Groups"
+          },
+          "coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Ratio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_intervals",
+          "intervals_with_record",
+          "intervals_missing",
+          "intervals_valid",
+          "intervals_invalid_value",
+          "intervals_ambiguous",
+          "duplicate_groups",
+          "duplicate_records_dropped",
+          "conflicting_groups",
+          "coverage_ratio"
+        ],
+        "title": "ActualQualityOut"
+      },
+      "AlignmentIssuesOut": {
+        "properties": {
+          "actual_malformed_records": {
+            "type": "integer",
+            "title": "Actual Malformed Records"
+          },
+          "actual_non_wind_ignored": {
+            "type": "integer",
+            "title": "Actual Non Wind Ignored"
+          },
+          "actual_missing_fuel_type": {
+            "type": "integer",
+            "title": "Actual Missing Fuel Type"
+          },
+          "actual_misaligned_start": {
+            "type": "integer",
+            "title": "Actual Misaligned Start"
+          },
+          "actual_settlement_mismatch": {
+            "type": "integer",
+            "title": "Actual Settlement Mismatch"
+          },
+          "actual_naive_timestamps": {
+            "type": "integer",
+            "title": "Actual Naive Timestamps"
+          },
+          "actual_missing_publish_time": {
+            "type": "integer",
+            "title": "Actual Missing Publish Time"
+          },
+          "actual_outside_period": {
+            "type": "integer",
+            "title": "Actual Outside Period"
+          },
+          "forecast_malformed_records": {
+            "type": "integer",
+            "title": "Forecast Malformed Records"
+          },
+          "forecast_misaligned_start": {
+            "type": "integer",
+            "title": "Forecast Misaligned Start"
+          },
+          "forecast_naive_timestamps": {
+            "type": "integer",
+            "title": "Forecast Naive Timestamps"
+          },
+          "forecast_missing_publish_time": {
+            "type": "integer",
+            "title": "Forecast Missing Publish Time"
+          },
+          "forecast_outside_period": {
+            "type": "integer",
+            "title": "Forecast Outside Period"
+          },
+          "overlap_duplicates_actual": {
+            "type": "integer",
+            "title": "Overlap Duplicates Actual"
+          },
+          "overlap_duplicates_forecast": {
+            "type": "integer",
+            "title": "Overlap Duplicates Forecast"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actual_malformed_records",
+          "actual_non_wind_ignored",
+          "actual_missing_fuel_type",
+          "actual_misaligned_start",
+          "actual_settlement_mismatch",
+          "actual_naive_timestamps",
+          "actual_missing_publish_time",
+          "actual_outside_period",
+          "forecast_malformed_records",
+          "forecast_misaligned_start",
+          "forecast_naive_timestamps",
+          "forecast_missing_publish_time",
+          "forecast_outside_period",
+          "overlap_duplicates_actual",
+          "overlap_duplicates_forecast"
+        ],
+        "title": "AlignmentIssuesOut"
+      },
+      "BiasDirectionOut": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "over_count": {
+            "type": "integer",
+            "title": "Over Count"
+          },
+          "under_count": {
+            "type": "integer",
+            "title": "Under Count"
+          },
+          "exact_count": {
+            "type": "integer",
+            "title": "Exact Count"
+          },
+          "over_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Over Share"
+          },
+          "under_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Under Share"
+          },
+          "mean_over_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Over Mw"
+          },
+          "mean_under_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Under Mw"
+          }
+        },
+        "type": "object",
+        "required": [
+          "n",
+          "over_count",
+          "under_count",
+          "exact_count",
+          "over_share",
+          "under_share",
+          "mean_over_mw",
+          "mean_under_mw"
+        ],
+        "title": "BiasDirectionOut"
+      },
+      "BucketOut": {
+        "properties": {
+          "bucket_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Bucket Start"
+          },
+          "bucket_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Bucket End"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "n_expected": {
+            "type": "integer",
+            "title": "N Expected"
+          },
+          "n_matched": {
+            "type": "integer",
+            "title": "N Matched"
+          },
+          "coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Ratio"
+          },
+          "mae_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mae Mw"
+          },
+          "rmse_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rmse Mw"
+          },
+          "bias_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bias Mw"
+          },
+          "wape": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wape"
+          },
+          "wape_status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "no_data",
+              "denominator_too_small"
+            ],
+            "title": "Wape Status"
+          },
+          "mean_actual_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Actual Mw"
+          },
+          "partial_bucket": {
+            "type": "boolean",
+            "title": "Partial Bucket"
+          },
+          "low_sample": {
+            "type": "boolean",
+            "title": "Low Sample"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bucket_start",
+          "bucket_end",
+          "label",
+          "n_expected",
+          "n_matched",
+          "coverage_ratio",
+          "mae_mw",
+          "rmse_mw",
+          "bias_mw",
+          "wape",
+          "wape_status",
+          "mean_actual_mw",
+          "partial_bucket",
+          "low_sample"
+        ],
+        "title": "BucketOut"
+      },
+      "ChunkOut": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "window": {
+            "type": "string",
+            "title": "Window"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "cached",
+              "downloaded",
+              "cached_stale",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "retrieved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At"
+          },
+          "record_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Count"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "key",
+          "window",
+          "state",
+          "retrieved_at",
+          "record_count",
+          "attempts",
+          "duration_ms",
+          "error"
+        ],
+        "title": "ChunkOut"
+      },
+      "ConfigOut": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "period": {
+            "$ref": "#/components/schemas/PeriodOut"
+          },
+          "default_cutoff": {
+            "$ref": "#/components/schemas/CutoffOut"
+          },
+          "wape_min_mean_actual_mw": {
+            "type": "number",
+            "title": "Wape Min Mean Actual Mw"
+          },
+          "min_sample_warning": {
+            "type": "integer",
+            "title": "Min Sample Warning"
+          },
+          "cache_stale_after_hours": {
+            "type": "integer",
+            "title": "Cache Stale After Hours"
+          },
+          "api_base_url": {
+            "type": "string",
+            "title": "Api Base Url"
+          },
+          "datasets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Datasets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "environment",
+          "period",
+          "default_cutoff",
+          "wape_min_mean_actual_mw",
+          "min_sample_warning",
+          "cache_stale_after_hours",
+          "api_base_url",
+          "datasets"
+        ],
+        "title": "ConfigOut"
+      },
+      "CoverageOut": {
+        "properties": {
+          "expected_intervals": {
+            "type": "integer",
+            "title": "Expected Intervals"
+          },
+          "actual_valid": {
+            "type": "integer",
+            "title": "Actual Valid"
+          },
+          "forecast_valid_at_cutoff": {
+            "type": "integer",
+            "title": "Forecast Valid At Cutoff"
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "excluded": {
+            "type": "integer",
+            "title": "Excluded"
+          },
+          "coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Ratio"
+          },
+          "actual_coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Coverage Ratio"
+          },
+          "forecast_coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Coverage Ratio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_intervals",
+          "actual_valid",
+          "forecast_valid_at_cutoff",
+          "matched",
+          "excluded",
+          "coverage_ratio",
+          "actual_coverage_ratio",
+          "forecast_coverage_ratio"
+        ],
+        "title": "CoverageOut"
+      },
+      "CutoffOut": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "day_ahead",
+              "lead_time"
+            ],
+            "title": "Mode"
+          },
+          "cutoff_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cutoff Time",
+            "description": "HH:MM Europe/London (day_ahead mode)"
+          },
+          "days_before": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Before"
+          },
+          "lead_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Hours"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Europe/London"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default"
+          },
+          "disclosure": {
+            "type": "string",
+            "title": "Disclosure"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "description",
+          "is_default",
+          "disclosure"
+        ],
+        "title": "CutoffOut"
+      },
+      "DatasetFreshnessOut": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "empty",
+              "loading",
+              "ready",
+              "partial",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "retrieved_at_latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At Latest"
+          },
+          "retrieved_at_oldest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At Oldest"
+          },
+          "source_max_publish_time_actual": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Max Publish Time Actual"
+          },
+          "source_max_publish_time_forecast": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Max Publish Time Forecast"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "stale",
+          "retrieved_at_latest",
+          "retrieved_at_oldest",
+          "source_max_publish_time_actual",
+          "source_max_publish_time_forecast"
+        ],
+        "title": "DatasetFreshnessOut"
+      },
+      "DatasetStatusOut": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "empty",
+              "loading",
+              "ready",
+              "partial",
+              "failed"
+            ],
+            "title": "State"
+          },
+          "ingestion_running": {
+            "type": "boolean",
+            "title": "Ingestion Running"
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale"
+          },
+          "stale_after_hours": {
+            "type": "integer",
+            "title": "Stale After Hours"
+          },
+          "chunks_total": {
+            "type": "integer",
+            "title": "Chunks Total"
+          },
+          "chunks_usable": {
+            "type": "integer",
+            "title": "Chunks Usable"
+          },
+          "chunks_failed": {
+            "type": "integer",
+            "title": "Chunks Failed"
+          },
+          "progress_completed": {
+            "type": "integer",
+            "title": "Progress Completed"
+          },
+          "progress_total": {
+            "type": "integer",
+            "title": "Progress Total"
+          },
+          "last_attempt_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Attempt At"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "retrieved_at_latest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At Latest"
+          },
+          "retrieved_at_oldest": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieved At Oldest"
+          },
+          "source_max_publish_time_actual": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Max Publish Time Actual"
+          },
+          "source_max_publish_time_forecast": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Max Publish Time Forecast"
+          },
+          "records_actual": {
+            "type": "integer",
+            "title": "Records Actual"
+          },
+          "records_forecast": {
+            "type": "integer",
+            "title": "Records Forecast"
+          },
+          "api_base_url": {
+            "type": "string",
+            "title": "Api Base Url"
+          },
+          "period": {
+            "$ref": "#/components/schemas/PeriodOut"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "ingestion_running",
+          "stale",
+          "stale_after_hours",
+          "chunks_total",
+          "chunks_usable",
+          "chunks_failed",
+          "progress_completed",
+          "progress_total",
+          "last_attempt_at",
+          "last_error",
+          "retrieved_at_latest",
+          "retrieved_at_oldest",
+          "source_max_publish_time_actual",
+          "source_max_publish_time_forecast",
+          "records_actual",
+          "records_forecast",
+          "api_base_url",
+          "period",
+          "message"
+        ],
+        "title": "DatasetStatusOut"
+      },
+      "ForecastQualityOut": {
+        "properties": {
+          "expected_intervals": {
+            "type": "integer",
+            "title": "Expected Intervals"
+          },
+          "intervals_with_any_record": {
+            "type": "integer",
+            "title": "Intervals With Any Record"
+          },
+          "intervals_no_record": {
+            "type": "integer",
+            "title": "Intervals No Record"
+          },
+          "intervals_hourly_resolution": {
+            "type": "integer",
+            "title": "Intervals Hourly Resolution"
+          },
+          "intervals_only_after_cutoff": {
+            "type": "integer",
+            "title": "Intervals Only After Cutoff"
+          },
+          "intervals_invalid_value": {
+            "type": "integer",
+            "title": "Intervals Invalid Value"
+          },
+          "intervals_ambiguous": {
+            "type": "integer",
+            "title": "Intervals Ambiguous"
+          },
+          "intervals_valid_at_cutoff": {
+            "type": "integer",
+            "title": "Intervals Valid At Cutoff"
+          },
+          "duplicate_records_dropped": {
+            "type": "integer",
+            "title": "Duplicate Records Dropped"
+          },
+          "conflicting_groups": {
+            "type": "integer",
+            "title": "Conflicting Groups"
+          },
+          "coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Ratio"
+          },
+          "half_hourly_start_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Half Hourly Start Share",
+            "description": "Share of parsed WINDFOR records whose startTime minute is :00 or :30"
+          },
+          "start_minute_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Start Minute Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "expected_intervals",
+          "intervals_with_any_record",
+          "intervals_no_record",
+          "intervals_hourly_resolution",
+          "intervals_only_after_cutoff",
+          "intervals_invalid_value",
+          "intervals_ambiguous",
+          "intervals_valid_at_cutoff",
+          "duplicate_records_dropped",
+          "conflicting_groups",
+          "coverage_ratio",
+          "half_hourly_start_share",
+          "start_minute_counts"
+        ],
+        "title": "ForecastQualityOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "time"
+        ],
+        "title": "HealthOut"
+      },
+      "HistogramBinOut": {
+        "properties": {
+          "lower_mw": {
+            "type": "number",
+            "title": "Lower Mw"
+          },
+          "upper_mw": {
+            "type": "number",
+            "title": "Upper Mw"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lower_mw",
+          "upper_mw",
+          "count"
+        ],
+        "title": "HistogramBinOut"
+      },
+      "HistogramOut": {
+        "properties": {
+          "bin_width_mw": {
+            "type": "number",
+            "title": "Bin Width Mw"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "bins": {
+            "items": {
+              "$ref": "#/components/schemas/HistogramBinOut"
+            },
+            "type": "array",
+            "title": "Bins"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bin_width_mw",
+          "n",
+          "bins"
+        ],
+        "title": "HistogramOut"
+      },
+      "IntervalDetailOut": {
+        "properties": {
+          "interval": {
+            "$ref": "#/components/schemas/IntervalOut"
+          },
+          "vintages": {
+            "items": {
+              "$ref": "#/components/schemas/VintageOut"
+            },
+            "type": "array",
+            "title": "Vintages"
+          },
+          "vintages_total": {
+            "type": "integer",
+            "title": "Vintages Total"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated"
+          },
+          "actual_record_count": {
+            "type": "integer",
+            "title": "Actual Record Count"
+          },
+          "actual_publish_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Publish Time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "interval",
+          "vintages",
+          "vintages_total",
+          "truncated",
+          "actual_record_count",
+          "actual_publish_time"
+        ],
+        "title": "IntervalDetailOut"
+      },
+      "IntervalOut": {
+        "properties": {
+          "start_time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time Utc"
+          },
+          "start_time_london": {
+            "type": "string",
+            "title": "Start Time London"
+          },
+          "settlement_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Settlement Date"
+          },
+          "settlement_period": {
+            "type": "integer",
+            "title": "Settlement Period"
+          },
+          "actual_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Mw"
+          },
+          "forecast_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Mw"
+          },
+          "signed_error_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed Error Mw"
+          },
+          "abs_error_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Abs Error Mw"
+          },
+          "forecast_publish_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Publish Time Utc"
+          },
+          "cutoff_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Cutoff Utc"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "matched",
+              "excluded"
+            ],
+            "title": "Status"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Explanation",
+            "description": "Plain-English reason for exclusion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time_utc",
+          "start_time_london",
+          "settlement_date",
+          "settlement_period",
+          "actual_mw",
+          "forecast_mw",
+          "signed_error_mw",
+          "abs_error_mw",
+          "forecast_publish_time_utc",
+          "cutoff_utc",
+          "status",
+          "reasons"
+        ],
+        "title": "IntervalOut"
+      },
+      "IntervalsPageOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IntervalOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          },
+          "matched_in_filter": {
+            "type": "integer",
+            "title": "Matched In Filter"
+          },
+          "excluded_in_filter": {
+            "type": "integer",
+            "title": "Excluded In Filter"
+          },
+          "cutoff": {
+            "$ref": "#/components/schemas/CutoffOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size",
+          "total_pages",
+          "matched_in_filter",
+          "excluded_in_filter",
+          "cutoff"
+        ],
+        "title": "IntervalsPageOut"
+      },
+      "MetricsOut": {
+        "properties": {
+          "n": {
+            "type": "integer",
+            "title": "N",
+            "description": "Matched intervals used for the metrics"
+          },
+          "mae_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mae Mw"
+          },
+          "rmse_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rmse Mw"
+          },
+          "bias_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bias Mw",
+            "description": "Mean of (forecast - actual); >0 = over-forecast"
+          },
+          "wape": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wape",
+            "description": "Sum|error| / Sum(actual); null when denominator invalid"
+          },
+          "wape_status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "no_data",
+              "denominator_too_small"
+            ],
+            "title": "Wape Status"
+          },
+          "wape_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wape Note"
+          },
+          "mean_actual_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Actual Mw"
+          },
+          "sum_actual_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sum Actual Mw"
+          },
+          "median_abs_error_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Abs Error Mw"
+          },
+          "p95_abs_error_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95 Abs Error Mw"
+          },
+          "max_abs_error_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Abs Error Mw"
+          },
+          "sample_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "n",
+          "mae_mw",
+          "rmse_mw",
+          "bias_mw",
+          "wape",
+          "wape_status",
+          "wape_note",
+          "mean_actual_mw",
+          "sum_actual_mw",
+          "median_abs_error_mw",
+          "p95_abs_error_mw",
+          "max_abs_error_mw",
+          "sample_warning"
+        ],
+        "title": "MetricsOut"
+      },
+      "MissingRunOut": {
+        "properties": {
+          "start_time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time Utc"
+          },
+          "end_time_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Time Utc"
+          },
+          "intervals": {
+            "type": "integer",
+            "title": "Intervals"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time_utc",
+          "end_time_utc",
+          "intervals",
+          "reasons"
+        ],
+        "title": "MissingRunOut"
+      },
+      "PeriodOut": {
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "format": "date",
+            "title": "Date From"
+          },
+          "date_to": {
+            "type": "string",
+            "format": "date",
+            "title": "Date To"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Europe/London"
+          },
+          "expected_intervals": {
+            "type": "integer",
+            "title": "Expected Intervals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date_from",
+          "date_to",
+          "expected_intervals"
+        ],
+        "title": "PeriodOut"
+      },
+      "QualityOut": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PeriodOut"
+          },
+          "cutoff": {
+            "$ref": "#/components/schemas/CutoffOut"
+          },
+          "actual": {
+            "$ref": "#/components/schemas/ActualQualityOut"
+          },
+          "forecast": {
+            "$ref": "#/components/schemas/ForecastQualityOut"
+          },
+          "alignment": {
+            "$ref": "#/components/schemas/AlignmentIssuesOut"
+          },
+          "exclusion_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Exclusion Counts"
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "excluded": {
+            "type": "integer",
+            "title": "Excluded"
+          },
+          "missing_runs": {
+            "items": {
+              "$ref": "#/components/schemas/MissingRunOut"
+            },
+            "type": "array",
+            "title": "Missing Runs"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceOut"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DatasetFreshnessOut"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/WarningOut"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "cutoff",
+          "actual",
+          "forecast",
+          "alignment",
+          "exclusion_counts",
+          "matched",
+          "excluded",
+          "missing_runs",
+          "sources",
+          "data",
+          "warnings"
+        ],
+        "title": "QualityOut"
+      },
+      "RefreshOut": {
+        "properties": {
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DatasetStatusOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "accepted",
+          "message",
+          "status"
+        ],
+        "title": "RefreshOut"
+      },
+      "RefreshRequest": {
+        "properties": {
+          "force": {
+            "type": "boolean",
+            "title": "Force",
+            "description": "Re-download every request even if cached",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "RefreshRequest"
+      },
+      "SensitivityOut": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PeriodOut"
+          },
+          "selected_cutoff": {
+            "$ref": "#/components/schemas/CutoffOut"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/SensitivityRowOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "selected_cutoff",
+          "rows",
+          "note"
+        ],
+        "title": "SensitivityOut"
+      },
+      "SensitivityRowOut": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "cutoff_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cutoff Time"
+          },
+          "lead_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead Hours"
+          },
+          "is_selected": {
+            "type": "boolean",
+            "title": "Is Selected"
+          },
+          "expected_intervals": {
+            "type": "integer",
+            "title": "Expected Intervals"
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched"
+          },
+          "coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Ratio"
+          },
+          "mae_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mae Mw"
+          },
+          "rmse_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rmse Mw"
+          },
+          "bias_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bias Mw"
+          },
+          "common_matched": {
+            "type": "integer",
+            "title": "Common Matched"
+          },
+          "common_mae_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Common Mae Mw"
+          },
+          "common_bias_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Common Bias Mw"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "cutoff_time",
+          "lead_hours",
+          "is_selected",
+          "expected_intervals",
+          "matched",
+          "coverage_ratio",
+          "mae_mw",
+          "rmse_mw",
+          "bias_mw",
+          "common_matched",
+          "common_mae_mw",
+          "common_bias_mw"
+        ],
+        "title": "SensitivityRowOut"
+      },
+      "SeriesOut": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PeriodOut"
+          },
+          "cutoff": {
+            "$ref": "#/components/schemas/CutoffOut"
+          },
+          "points": {
+            "items": {
+              "$ref": "#/components/schemas/SeriesPointOut"
+            },
+            "type": "array",
+            "title": "Points"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DatasetFreshnessOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "cutoff",
+          "points",
+          "data"
+        ],
+        "title": "SeriesOut"
+      },
+      "SeriesPointOut": {
+        "properties": {
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "actual_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Mw"
+          },
+          "forecast_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Mw"
+          },
+          "signed_error_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed Error Mw"
+          },
+          "forecast_publish_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Publish Time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "matched",
+              "excluded"
+            ],
+            "title": "Status"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_time",
+          "actual_mw",
+          "forecast_mw",
+          "signed_error_mw",
+          "forecast_publish_time",
+          "status",
+          "reasons"
+        ],
+        "title": "SeriesPointOut"
+      },
+      "SourceOut": {
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "raw_records": {
+            "type": "integer",
+            "title": "Raw Records"
+          },
+          "requests_total": {
+            "type": "integer",
+            "title": "Requests Total"
+          },
+          "requests_ok": {
+            "type": "integer",
+            "title": "Requests Ok"
+          },
+          "requests_failed": {
+            "type": "integer",
+            "title": "Requests Failed"
+          },
+          "latest_retrieval": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Retrieval"
+          },
+          "max_source_publish_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Source Publish Time"
+          },
+          "chunks": {
+            "items": {
+              "$ref": "#/components/schemas/ChunkOut"
+            },
+            "type": "array",
+            "title": "Chunks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dataset",
+          "description",
+          "raw_records",
+          "requests_total",
+          "requests_ok",
+          "requests_failed",
+          "latest_retrieval",
+          "max_source_publish_time",
+          "chunks"
+        ],
+        "title": "SourceOut"
+      },
+      "SummaryOut": {
+        "properties": {
+          "period": {
+            "$ref": "#/components/schemas/PeriodOut"
+          },
+          "cutoff": {
+            "$ref": "#/components/schemas/CutoffOut"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MetricsOut"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/CoverageOut"
+          },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/BucketOut"
+            },
+            "type": "array",
+            "title": "Daily"
+          },
+          "histogram": {
+            "$ref": "#/components/schemas/HistogramOut"
+          },
+          "exclusion_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Exclusion Counts"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DatasetFreshnessOut"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/WarningOut"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "cutoff",
+          "metrics",
+          "coverage",
+          "daily",
+          "histogram",
+          "exclusion_counts",
+          "data",
+          "warnings"
+        ],
+        "title": "SummaryOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VintageOut": {
+        "properties": {
+          "publish_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Publish Time"
+          },
+          "forecast_mw": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forecast Mw"
+          },
+          "ambiguous": {
+            "type": "boolean",
+            "title": "Ambiguous"
+          },
+          "published_at_or_before_cutoff": {
+            "type": "boolean",
+            "title": "Published At Or Before Cutoff"
+          },
+          "selected": {
+            "type": "boolean",
+            "title": "Selected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "publish_time",
+          "forecast_mw",
+          "ambiguous",
+          "published_at_or_before_cutoff",
+          "selected"
+        ],
+        "title": "VintageOut"
+      },
+      "WarningOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error"
+            ],
+            "title": "Severity"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "message"
+        ],
+        "title": "WarningOut"
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# Render blueprint for the API (the frontend goes on Vercel). A persistent disk keeps the Elexon cache across deploys.
+services:
+  - type: web
+    name: windscope-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    disk:
+      name: windscope-cache
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: WINDSCOPE_APP_ENV
+        value: production
+      - key: WINDSCOPE_CORS_ORIGINS
+        sync: false   # set to your Vercel URL
